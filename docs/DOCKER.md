@@ -322,7 +322,9 @@ files the signed update feed names. Nothing publishes by itself: a maintainer st
    If the release tag does not contain the image build scripts for a flavor in its feed, set **source_ref** to a branch or commit
    that supports that flavor.
 3. Run it again with **push on**. It logs in to `ghcr.io` with the job's `GITHUB_TOKEN` (`packages: write`) and pushes
-   `ghcr.io/niko1221/strata:0.2.7-<flavor>` and `latest-<flavor>`. Turn **latest** off for a pre-release.
+   `ghcr.io/<owner>/<repository>:0.2.7-<flavor>` and `latest-<flavor>`. The image name comes from the repository where the
+   workflow runs, lowercased for GHCR. Turn **latest** off
+   for a pre-release.
 4. The first push creates each package as private. In the repository's Packages, open every package, **Package settings, Change
    visibility, Public**, and check it is linked to the repository (the image carries the `org.opencontainers.image.source` label).
 5. Check one pull from a computer that is not logged in: `docker pull ghcr.io/niko1221/strata:0.2.7-cuda13`.
