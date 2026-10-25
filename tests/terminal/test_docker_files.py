@@ -55,6 +55,55 @@ class Scripts(unittest.TestCase):
             self.assertTrue((ctx / "terminal-src" / "docs" / "TERMINAL_LAUNCH.md").is_file())
             self.assertTrue((ctx / "engine" / "pkg" / "engine-component.json").is_file())
 
+    @unittest.skipIf(SH is None or shutil.which("tar") is None, "needs sh and tar")
+    def test_build_script_uses_selected_podman_engine(self):
+        import os
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pkg = root / "pkg"
+            pkg.mkdir()
+            (pkg / "engine-component.json").write_text('{"entrypoint": "strata"}', encoding="utf-8")
+            (pkg / "strata").write_text("#!/bin/sh\n", encoding="utf-8")
+            (pkg / "strata").chmod(0o755)
+            podman = root / "podman"
+            log = root / "podman.log"
+            podman.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$PODMAN_LOG"\nprintf "123\\n"\n', encoding="utf-8")
+            podman.chmod(0o755)
+            env = dict(os.environ, CONTAINER_ENGINE="podman", PODMAN_LOG=str(log))
+            env["PATH"] = f"{root}:{env['PATH']}"
+            result = subprocess.run(
+                [SH, sh_path(DOCKER / "build.sh"), "--flavor", "hip", "--engine", sh_path(pkg),
+                 "--ctx", sh_path(root / "ctx"), "--tag", "localhost/strata:test"],
+                capture_output=True, text=True, env=env, cwd=str(ROOT),
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            calls = log.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(calls), 3)
+            self.assertTrue(calls[0].startswith("build "))
+            self.assertIn("--build-arg FLAVOR=hip", calls[0])
+            self.assertEqual(calls[1], "image inspect localhost/strata:test --format built {{.RepoTags}} {{.Size}} bytes")
+            self.assertEqual(calls[2], "image inspect localhost/strata:test --format {{.Size}}")
+            self.assertIn("Size on disk: 123 bytes.", result.stdout)
+
+    @unittest.skipIf(SH is None, "needs sh")
+    def test_build_script_rejects_unknown_container_engine(self):
+        import os
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pkg = Path(tmp) / "pkg"
+            pkg.mkdir()
+            (pkg / "engine-component.json").write_text('{"entrypoint": "strata"}', encoding="utf-8")
+            env = dict(os.environ, CONTAINER_ENGINE="not-an-engine")
+            result = subprocess.run(
+                [SH, sh_path(DOCKER / "build.sh"), "--flavor", "hip", "--engine", sh_path(pkg), "--ctx-only"],
+                capture_output=True, text=True, env=env, cwd=str(ROOT),
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("CONTAINER_ENGINE must be docker or podman", result.stderr)
+
     def test_scripts_use_unix_line_ends(self):
         for name in ("entrypoint.sh", "strata-wrapper.sh", "healthcheck.sh", "build.sh", "publish.sh"):
             self.assertNotIn(b"\r", (DOCKER / name).read_bytes(), name)       # build.sh strips CR for a CRLF checkout, the files themselves stay LF

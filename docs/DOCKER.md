@@ -289,11 +289,18 @@ docker/build.sh --flavor hip  --engine ~/components/engine/<hip-rx9070-package-f
 docker/build.sh --flavor sycl --engine ~/components/engine/<sycl-package-folder> --tag strata:0.2.3-sycl
 ```
 
-`build.sh` assembles the build context (the Terminal's files and the package) and runs `docker build`. The build makes the
-Terminal exactly as the release archive (Python 3.12 and the locked packages, fetched at build time only), then checks the
-engine package before it may enter the image: every file's SHA-256, and that every library it imports is bundled or belongs
-to the system or the graphics driver (`packaging/binary_deps.py`); finally it checks that the dynamic linker resolves every
-library inside the finished image. A package that fails any of these stops the build. Nothing is pushed anywhere.
+The build uses Docker by default. Set `CONTAINER_ENGINE=podman` to build and inspect the image with Podman instead:
+
+```sh
+CONTAINER_ENGINE=podman docker/build.sh --flavor hip \
+  --engine ~/components/engine/<a-hip-package-folder> --tag localhost/strata:0.2.3-rocm-gfx120x
+```
+
+`build.sh` assembles the build context (the Terminal's files and the package) and runs the selected engine's build command.
+The build makes the Terminal exactly as the release archive (Python 3.12 and the locked packages, fetched at build time only),
+then checks the engine package before it may enter the image: every file's SHA-256, and that every library it imports is
+bundled or belongs to the system or the graphics driver (`packaging/binary_deps.py`); finally it checks that the dynamic linker
+resolves every library inside the finished image. A package that fails any of these stops the build. Nothing is pushed anywhere.
 `docker/smoke-test.sh` runs the checks we ran on real cards (serves, key, chat, tool call, monitor, clean stop, memory freed, restart); see its first lines for the variables.
 
 **From source.** `docker build -t strata:src .` in the repository compiles the CUDA 13 engine inside Docker, makes the package

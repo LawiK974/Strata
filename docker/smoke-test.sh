@@ -76,7 +76,7 @@ chk=$($DOCKER exec "$NAME" strata connect opencode --check 2>&1); echo "$chk" | 
 echo "$chk" | grep -q "^FAIL" && bad "connect opencode --check reported a failure (model answered in words instead of calling the tool? see above)" || ok "connect opencode --check: prompt and tool call"
 step "GPU used while serving: $(gpu_used)"
 step "docker stats / health"
-$DOCKER inspect -f 'health={{.State.Health.Status}}' "$NAME"
+$DOCKER inspect -f 'health={{if .State.Health}}{{.State.Health.Status}}{{else}}not-reported{{end}}' "$NAME"
 $DOCKER stats --no-stream --format 'mem={{.MemUsage}} cpu={{.CPUPerc}}' "$NAME"
 
 step "docker stop (clean stop)"

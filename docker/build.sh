@@ -1,5 +1,5 @@
 #!/bin/sh
-# Build a Strata image from an engine component package. Run it on a Linux x86_64 machine with Docker (it needs the internet
+# Build a Strata image from an engine component package. Run it on a Linux x86_64 machine with Docker or Podman (it needs the internet
 # for the base image and for the Terminal's pinned Python and locked wheels; the engine package is local).
 #
 #   docker/build.sh --flavor cuda --engine ~/pkgs/0.1.45.3-linux-x86_64-cuda-cuda13 --tag strata:0.2.3-cuda13
@@ -15,14 +15,16 @@
 #   --repo DIR               the Strata source tree (default: the one this script is in)
 #   --version V              label (default: read from CMakeLists.txt)
 #   --ctx DIR                keep the build context here (default: a temporary folder, removed after the build)
-#   --no-cache               docker build --no-cache
+#   --no-cache               skip the container engine build cache
 #   --ctx-only               assemble the context and stop
-# Environment: STRATA_DOCKER_BUILD_OPTS adds options to `docker build` (for example --network host).
-# Nothing is pushed anywhere; the image stays in the local Docker.
+# Environment: CONTAINER_ENGINE selects docker (default) or podman.
+#              STRATA_DOCKER_BUILD_OPTS adds options to the build command (for example --network host).
+# Nothing is pushed anywhere; the image stays in the local container engine.
 set -eu
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 repo=$(CDPATH= cd -- "$here/.." && pwd -P)
+container_engine=${CONTAINER_ENGINE:-docker}
 flavor=""; tag=""; base=""; version=""; ctx=""; nocache=""; ctxonly=""
 engines=""
 while [ $# -gt 0 ]; do
@@ -43,6 +45,7 @@ $2"; shift 2 ;;
 done
 [ -n "$flavor" ] || { echo "build.sh: --flavor cuda|hip|sycl is required" >&2; exit 2; }
 case "$flavor" in cuda|hip|sycl) ;; *) echo "build.sh: --flavor must be cuda, hip or sycl" >&2; exit 2 ;; esac
+case "$container_engine" in docker|podman) ;; *) echo "build.sh: CONTAINER_ENGINE must be docker or podman" >&2; exit 2 ;; esac
 [ -n "$engines" ] || { echo "build.sh: --engine <package folder> is required" >&2; exit 2; }
 [ -n "$base" ] || { [ "$flavor" = sycl ] && base=ubuntu:26.04 || base=ubuntu:24.04; }
 if [ -z "$version" ]; then
@@ -98,11 +101,12 @@ engine_label=$(for e in $engines; do basename "$e"; done | tr '\n' ' ' | sed 's/
 echo "context: $ctx"
 echo "flavor $flavor, base $base, engine(s): $engine_label, tag $tag"
 [ -n "$ctxonly" ] && { echo "context kept (--ctx-only)"; exit 0; }
+command -v "$container_engine" >/dev/null 2>&1 || { echo "build.sh: $container_engine was not found in PATH" >&2; exit 127; }
 
 # shellcheck disable=SC2086
-docker build $nocache ${STRATA_DOCKER_BUILD_OPTS:-} \
+"$container_engine" build $nocache ${STRATA_DOCKER_BUILD_OPTS:-} \
   --build-arg "BASE_IMAGE=$base" --build-arg "FLAVOR=$flavor" \
   --build-arg "STRATA_COMMIT=$commit" --build-arg "STRATA_VERSION=$version" --build-arg "ENGINE_LABEL=$engine_label" \
   -t "$tag" "$ctx"
-docker image inspect "$tag" --format 'built {{.RepoTags}} {{.Size}} bytes'
-echo "Not pushed anywhere. Size on disk: $(docker image inspect "$tag" --format '{{.Size}}') bytes."
+"$container_engine" image inspect "$tag" --format 'built {{.RepoTags}} {{.Size}} bytes'
+echo "Not pushed anywhere. Size on disk: $("$container_engine" image inspect "$tag" --format '{{.Size}}') bytes."
