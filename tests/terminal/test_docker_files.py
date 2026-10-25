@@ -200,7 +200,9 @@ class Publishing(unittest.TestCase):
         self.assertEqual(data["permissions"], {"contents": "read"})
         self.assertEqual(data["jobs"]["image"]["permissions"], {"contents": "read", "packages": "write"})
         text = self.WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("ghcr.io/niko1221/strata", text)
+        self.assertIn('GITHUB_REPOSITORY" | tr', text)
+        self.assertIn('IMAGE=ghcr.io/$(printf', text)
+        self.assertNotIn("ghcr.io/niko1221/strata", text)
         self.assertIn("docker/publish.sh", text)
         self.assertNotIn("${{ secrets.GITHUB_TOKEN }}\" |", text)   # the token goes through an env variable, not into the command line
 

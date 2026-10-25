@@ -317,10 +317,13 @@ files the signed update feed names. Nothing publishes by itself: a maintainer st
    If the release tag does not contain the image build scripts for a flavor in its feed, set **source_ref** to a branch or commit
    that supports that flavor.
 3. Run it again with **push on**. It logs in to `ghcr.io` with the job's `GITHUB_TOKEN` (`packages: write`) and pushes
-   `ghcr.io/niko1221/strata:0.2.3-<flavor>` and `latest-<flavor>`. Turn **latest** off for a pre-release.
+   `ghcr.io/<owner>/<repository>:0.2.3-<flavor>` and `latest-<flavor>`. The image name comes from the repository where the
+   workflow runs, lowercased for GHCR; for a fork owned by `LawiK974`, it is `ghcr.io/lawik974/strata`. Turn **latest** off
+   for a pre-release.
 4. The first push creates each package as private. In the repository's Packages, open every package, **Package settings, Change
    visibility, Public**, and check it is linked to the repository (the image carries the `org.opencontainers.image.source` label).
-5. Check one pull from a computer that is not logged in: `docker pull ghcr.io/niko1221/strata:0.2.3-cuda13`.
+5. Check one pull from a computer that is not logged in, using the repository's image name; for example:
+   `docker pull ghcr.io/lawik974/strata:0.2.3-cuda13`.
 
 For each flavor the job runs [docker/fetch-engines.py](../docker/fetch-engines.py), which reads the release's signed feed (the
 Ed25519 key in `strata_control/update_keys.json`), downloads the package, and checks the archive's size and SHA-256, the manifest
