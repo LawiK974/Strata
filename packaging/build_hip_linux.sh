@@ -97,8 +97,9 @@ EOJ
 DATA=(--data "$LIBW/lib/rocblas/library=rocblas/library" --data "$LIBW/lib/hipblaslt/library=hipblaslt/library" --data-arch "$DATAARCH")
 BINS=("$OUT/b/strata" "$OUT/bh/bin/strata-vision-hip"); [ "$DSV41" = 1 ] && BINS+=("$OUT/bd/strata-dsv41")
 for b in "${BINS[@]}"; do
-  python3 packaging/collect_libs.py --binary "$b" --search "$LIBW/lib" --search "$HP/lib" --search "$CORE/lib" --search "$CORE/lib/llvm/lib" ${SYSDEPS:+--search "$HP/lib/rocm_sysdeps/lib"} \
-    --also 'libamd_comgr.so*' --also 'libhiprtc*.so*' --out "$STAGE" \
+  python3 packaging/collect_libs.py --binary "$b" --search "$LIBW/lib" --search "$HP/lib" --search "$CORE/lib" --search "$CORE/lib/llvm/lib" \
+    --search /usr/lib/x86_64-linux-gnu ${SYSDEPS:+--search "$HP/lib/rocm_sysdeps/lib"} \
+    --also 'libamd_comgr.so*' --also 'libhiprtc*.so*' --also 'libzstd.so.1' --out "$STAGE" \
     "${DATA[@]}" >> "$OUT/collect.log" 2>&1
   chk $? "collected for $(basename "$b")"
   DATA=()                                              # the kernel data once
@@ -118,6 +119,8 @@ ARCHARGS=""; for a in $ARCHLIST; do ARCHARGS="$ARCHARGS --arch $a"; done
 REQ=""; [ "$DSV41" = 1 ] && REQ="--require-dsv41"
 python3 packaging/package_engine.py --src "$STAGE" --backend hip --version "$PKGVER" --out "$OUT/components/engine" $ARCHARGS \
   --variant "$V" --build-id "$COMMIT+rocm" --tree $REQ --notes "AMD $V build: engine, CPU picture reader, GPU picture reader$([ "$DSV41" = 1 ] && echo ", DeepSeek-V4.1 engine")${NOTE_EXTRA:-}" > "$OUT/package.log" 2>&1
-chk $? "packaged"
+rc=$?
+st "packaged rc=$rc"
 cat "$OUT/package.log" >> "$S"
+[ "$rc" -eq 0 ] || { st "ABORT packaging failed (rc=$rc)"; exit "$rc"; }
 st "BUILD-DONE"
