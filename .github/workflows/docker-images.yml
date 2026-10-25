@@ -6,7 +6,7 @@ name: Docker images
 # For each flavor the job downloads the engine package from the release and checks it against the signed update feed
 # (docker/fetch-engines.py: the feed's Ed25519 signature, the archive's SHA-256, the manifest hash, the package signature,
 # every file's hash), builds the image with docker/build.sh and, only when "push" is on, pushes
-#   ghcr.io/niko1221/strata:<version>-<flavor>   and   ghcr.io/niko1221/strata:latest-<flavor>
+#   ghcr.io/<owner>/<repository>:<version>-<flavor>   and   ghcr.io/<owner>/<repository>:latest-<flavor>
 # The first run with "push" off builds everything without publishing it (a dry run).
 
 on:
@@ -39,9 +39,6 @@ on:
 
 permissions:
   contents: read
-
-env:
-  IMAGE: ghcr.io/niko1221/strata
 
 jobs:
   plan:
@@ -88,6 +85,8 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
           docker system prune -af >/dev/null 2>&1 || true
           df -h /
+      - name: Set image name from this repository
+        run: echo "IMAGE=ghcr.io/$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
       - name: Log in to ghcr.io
         if: ${{ inputs.push }}
         env:
