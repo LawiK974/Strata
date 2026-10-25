@@ -53,6 +53,7 @@ class Scripts(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertTrue((ctx / "Dockerfile").is_file())
             self.assertTrue((ctx / "terminal-src" / "docs" / "TERMINAL_LAUNCH.md").is_file())
+            self.assertTrue((ctx / "terminal-src" / "tools" / "dsv41" / "tune.py").is_file())
             self.assertTrue((ctx / "engine" / "pkg" / "engine-component.json").is_file())
 
     def test_scripts_use_unix_line_ends(self):
@@ -186,6 +187,17 @@ class Publishing(unittest.TestCase):
         self.assertTrue(payload)
         for item in payload:
             self.assertTrue(any(item == p or item.startswith(p.rstrip("/") + "/") for p in listed), f"build.sh does not copy {item}")
+        installer_scripts = next(
+            ast.literal_eval(node.value) for node in pt.body
+            if isinstance(node, ast.Assign) and any(getattr(t, "id", "") == "INSTALLER_SCRIPTS" for t in node.targets)
+        )
+        for item in installer_scripts:
+            if "/" in item:
+                source = f"tools/{item}.py"
+                self.assertTrue(
+                    any(source == p or source.startswith(p.rstrip("/") + "/") for p in listed),
+                    f"build.sh does not copy installer script {source}",
+                )
 
     def test_workflow_is_manual_and_pushes_only_on_request(self):
         data = yaml.safe_load(self.WORKFLOW.read_text(encoding="utf-8"))
