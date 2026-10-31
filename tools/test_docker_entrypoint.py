@@ -110,7 +110,9 @@ class Entrypoint(unittest.TestCase):
         self.stop(p)
         self.log.unlink()
         p = self.start(STUB_PRESET="1", STUB_TUNED="tuned x", TUNE="quick", RETUNE="1")
-        self.assertIn("--tune quick", self.launch_line(self.wait_for("--show-key")))
+        line = self.launch_line(self.wait_for("--show-key"))
+        self.assertIn("--tune quick", line)
+        self.assertIn("--retune", line)
         self.stop(p)
 
     def test_no_settings_asks_for_the_recommended_model_and_warns(self):
