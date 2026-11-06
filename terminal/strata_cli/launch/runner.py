@@ -1420,7 +1420,7 @@ class Runner:
         if sys.platform == "darwin":
             # a Mac's setup (Control mode, strata_control/mac_fit.py) takes fewer options (no --kv, --gpu, speed projection)
             keep = {"--yes", "--no-start", "--family", "--model", "--context", "--vision", "--data-dir", "--gguf-dir", "--move-data",
-                    "--set-default-data-dir", "--feed", "--drafter", "--mtp", "--draft-vocab"}     # --drafter / --mtp: setup.py's Mac step fetches the draft layer only where the
+                    "--set-default-data-dir", "--feed", "--drafter", "--mtp", "--dsv41-package", "--draft-vocab"}     # --drafter / --mtp: setup.py's Mac step fetches the draft layer only where the
                                                                                   # start runs the MTP, and not after a Drafting Off (`--mtp off`)
             flags = ("--yes", "--no-start", "--move-data", "--set-default-data-dir")
             out, i = [], 0
