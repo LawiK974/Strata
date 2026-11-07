@@ -36,6 +36,16 @@ on:
         required: false
         default: ''
         type: string
+      repo:
+        description: 'GitHub repository the release lives on (empty: Niko1221/Strata; a fork, e.g. LawiK974/Strata)'
+        required: false
+        default: ''
+        type: string
+      trusted_keys:
+        description: 'Extra public update keys as JSON ({"keys":[{"alg":"ed25519","key_id":"…","public":"…"}]}) for a feed signed by your own key (empty: only the pinned key)'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -49,15 +59,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_ref || inputs.release_tag }}
+      - name: Trust the fork's update key when one is given
+        if: ${{ inputs.trusted_keys != '' }}
+        env:
+          KEYS: ${{ inputs.trusted_keys }}
+        run: |
+          printf '%s\n' "$KEYS" > "$RUNNER_TEMP/feed-keys.json"
+          echo "STRATA_UPDATE_TRUSTED_KEYS=$RUNNER_TEMP/feed-keys.json" >> "$GITHUB_ENV"
       - name: Which flavors does the release have a package for
         id: list
         env:
           WANT: ${{ inputs.flavors }}
           TAG: ${{ inputs.release_tag }}
+          REPO: ${{ inputs.repo }}
         run: |
           set -eu
           args="--release-tag $TAG --list --skip-missing"
           [ -n "$WANT" ] && args="$args --flavors $WANT"
+          [ -n "$REPO" ] && args="$args --repo $REPO"
           python3 docker/fetch-engines.py $args > list.tsv
           cat list.tsv
           flavors=$(awk -F'\t' '$3 != "SKIP" {printf "%s\"%s\"", (n++ ? "," : ""), $1}' list.tsv)
@@ -80,6 +99,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_ref || inputs.release_tag }}
+      - name: Trust the fork's update key when one is given
+        if: ${{ inputs.trusted_keys != '' }}
+        env:
+          KEYS: ${{ inputs.trusted_keys }}
+        run: |
+          printf '%s\n' "$KEYS" > "$RUNNER_TEMP/feed-keys.json"
+          echo "STRATA_UPDATE_TRUSTED_KEYS=$RUNNER_TEMP/feed-keys.json" >> "$GITHUB_ENV"
       - name: Free disk space (the runner has about 14 GB; a package plus its image needs about 10 GB)
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
@@ -99,8 +125,10 @@ jobs:
           FLAVOR: ${{ matrix.flavor }}
           PUSH: ${{ inputs.push && '--push' || '' }}
           LATEST: ${{ !inputs.latest && '--no-latest' || '' }}
+          REPO: ${{ inputs.repo }}
         run: |
-          docker/publish.sh --release-tag "$TAG" --flavors "$FLAVOR" --image "$IMAGE" $PUSH $LATEST
+          repo_arg=""; [ -n "$REPO" ] && repo_arg="--repo $REPO"
+          docker/publish.sh --release-tag "$TAG" --flavors "$FLAVOR" --image "$IMAGE" $PUSH $LATEST $repo_arg
       - name: Summary
         if: ${{ always() }}
         run: |

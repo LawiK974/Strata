@@ -20,16 +20,19 @@
 #   --version V          image version (default: the tag without v)
 #   --flavors LIST       comma separated (default: all that the release has: cuda13 cuda12 rocm-gfx1031 rocm-gfx120x rocm-gfx110x rocm-gfx1151 sycl)
 #   --image NAME         image repository (default ghcr.io/niko1221/strata)
+#   --repo OWNER/NAME    the GitHub repository the release is on (default Niko1221/Strata; your fork, e.g. LawiK974/Strata)
 #   --work DIR           where packages are unpacked (default a temporary folder, removed at the end)
 #   --push               push the images (default: build only)
 #   --no-latest          do not tag / push latest-<flavor>
 #   --keep-images        do not remove the local images after the run (default: removed only when this script pushed them)
 # Environment: STRATA_DOCKER_BUILD_OPTS adds options to `docker build` (see build.sh).
+#              STRATA_UPDATE_TRUSTED_KEYS points at a file of extra public update keys ({"keys":[...]}) — the key of a fork's own
+#              feed, which the pinned strata_control/update_keys.json does not trust. fetch-engines.py reads it.
 set -eu
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 repo=$(CDPATH= cd -- "$here/.." && pwd -P)
-tag=""; source=""; version=""; flavors=""; image="ghcr.io/niko1221/strata"; work=""; push=""; latest=1; keepimg=""
+tag=""; source=""; version=""; flavors=""; image="ghcr.io/niko1221/strata"; gh_repo=""; work=""; push=""; latest=1; keepimg=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --release-tag) tag=$2; shift 2 ;;
@@ -37,11 +40,12 @@ while [ $# -gt 0 ]; do
     --version) version=$2; shift 2 ;;
     --flavors) flavors=$2; shift 2 ;;
     --image) image=$2; shift 2 ;;
+    --repo) gh_repo=$2; shift 2 ;;
     --work) work=$2; shift 2 ;;
     --push) push=1; shift ;;
     --no-latest) latest=""; shift ;;
     --keep-images) keepimg=1; shift ;;
-    -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
     *) echo "publish.sh: unknown option $1" >&2; exit 2 ;;
   esac
 done
@@ -66,8 +70,9 @@ flavor_list=${flavors:-cuda13,cuda12,rocm-gfx1031,rocm-gfx120x,rocm-gfx110x,rocm
 for flavor in $(echo "$flavor_list" | tr ',' ' '); do
   echo "=== $flavor"
   src_arg="--release-tag $tag"; [ -n "$source" ] && src_arg="--source $source"
+  repo_arg=""; [ -n "$gh_repo" ] && repo_arg="--repo $gh_repo"
   # a failed fetch (bad signature, bad hash) must stop the run: it is not a skipped flavor
-  $PY "$here/fetch-engines.py" --out "$work" --skip-missing --flavors "$flavor" $src_arg > "$work/.fetch.out"
+  $PY "$here/fetch-engines.py" --out "$work" --skip-missing --flavors "$flavor" $src_arg $repo_arg > "$work/.fetch.out"
   line=$(tail -1 "$work/.fetch.out")
   bflavor=$(echo "$line" | cut -f2); folder=$(echo "$line" | cut -f3)
   if [ "$folder" = "SKIP" ] || [ -z "$folder" ]; then echo "$flavor: no package in this release, skipped"; continue; fi

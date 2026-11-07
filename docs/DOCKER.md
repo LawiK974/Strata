@@ -356,6 +356,28 @@ The workflow's default flavor list comes from the signed release feed. Once that
 `ghcr.io/niko1221/strata:latest-rocm-gfx1031`.
 The images run on the runner without a graphics card, so the card checks (`docker/smoke-test.sh`) stay a manual step on a computer with the card.
 
+## Publishing from a fork
+
+A fork cannot use the upstream feed: `strata_control/update_keys.json` trusts only the owner's key, and a fork may not edit it.
+Make your own key and pass it to the fetch step as an extra trusted key. Nothing here runs on GitHub; you run it on your own
+computer, where the engine is built (`build_cuda_linux.sh`, or `docker build` from source), then upload the files to a release.
+
+```sh
+python packaging/feed_tool.py keygen --out ~/strata-keys            # once; never inside a git checkout
+python packaging/feed_tool.py sign-package <components>/engine/0.1.50-linux-x86_64-cuda-cuda13 --key ~/strata-keys/feed-key.json
+python packaging/feed_tool.py pack-engine <that folder> --out RELEASE --url-prefix "" --prefix strata-engine
+python packaging/feed_tool.py build-feed --out RELEASE --sequence 1 --engine RELEASE --key ~/strata-keys/feed-key.json
+python packaging/feed_tool.py verify-feed RELEASE --pub ~/strata-keys/feed-key.pub.json
+```
+
+`--url-prefix ""` because GitHub release assets sit flat, beside the feed (the flags are in [UPDATES.md](../packaging/UPDATES.md#how-the-owner-makes-the-real-keys-once)).
+Upload `strata-feed.json`, `strata-feed.json.sig` and every archive to a release on the fork (`gh release create v0.2.7 …`
+where `gh` is installed, or the release page's upload box). `--sequence` must not go backwards on later feeds.
+Then **Actions, Docker images, Run workflow** on the fork with **repo** set to `LawiK974/Strata` and **trusted_keys** set to the
+contents of `~/strata-keys/feed-key.pub.json` (`{"keys":[…]}`, the public part only — the secret key never goes to GitHub).
+The same by hand: `docker/publish.sh --release-tag v0.2.7 --repo LawiK974/Strata` with
+`STRATA_UPDATE_TRUSTED_KEYS=~/strata-keys/feed-key.pub.json` exported. Images push to `ghcr.io/<your fork>/<repository>`.
+
 ## Known limits
 
 - Linux x86-64 hosts only. Docker on Windows reaches NVIDIA cards only; Docker on a Mac cannot use the GPU.
