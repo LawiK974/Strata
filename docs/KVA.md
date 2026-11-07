@@ -48,7 +48,9 @@ KVA runs when all of these hold, and says so in the engine log:
   layers and 512 experts. Any other model (Qwen3.6-35B-A3B, other layer or expert counts) reads exactly even with
   `STRATA_KVA=1` and logs `KVA configured but NOT applied: this model's shape (L layers, E experts) is not one KVA was
   measured on`. `STRATA_KVA_ANY_MODEL=1` (research) lets it run there anyway, with one warning;
-- one GPU, no `--batch` slots, no `--peer-device`, no DFlash2 drafter;
+- one GPU, no `--batch` slots, no `--peer-device`. A DFlash2 drafter works: its taps are the prompt's last 2047 rows,
+  which the 2048-token tail keeps exact. Only a tail shorter than that window (`STRATA_KVA_SUFFIX`) turns KVA off,
+  because the drafter would then read rows the late layers never computed;
 - the read is cold (it starts at position 0 of the session) and the text has no pictures;
 - the prompt (or the part of it read in one go, see below) has at least `STRATA_KVA_MIN_PROMPT` tokens (4096) and
   more than the fully computed tail plus 64.

@@ -3313,10 +3313,16 @@ bool Prefill::run_impl(const int64_t* tokens, int64_t n, int64_t pos0, std::stri
     // stage, no capture).  Positions [0, kva_frontier) are approximated in the layers at and after the split.
     const KvaConfig& kva = kva_config();
     const KvaEngine& kva_eng = kva_engine();
+    const int64_t kva_split = std::min<int64_t>(std::max<int64_t>(kva.split, 1), g.n_layers);
     const int64_t kva_suffix = kva.effective_suffix();
+    const int64_t kva_frontier = std::max<int64_t>(0, n - kva_suffix);
     bool kva_routine = false;
+    // DFlash2 taps are gathered from the residual of the tapped layers, which an approximated chunk never writes.
+    // The prompt path taps only the last 2047 rows (tap_first_), inside the default 2048-token exact tail, so a
+    // drafter is compatible unless the tail is shortened below that window.
+    const bool kva_tap_conflict = !tap_layers_.empty() && tap_first_ < kva_frontier;
     const char* kva_why_not = kva.decline(kva_eng, pos0, n, LB, LE < 0 ? -1 : LE, (int64_t) g.n_layers,
-                                          embd_rows != nullptr, !tap_layers_.empty(), &kva_routine,
+                                          embd_rows != nullptr, kva_tap_conflict, &kva_routine,
                                           g.n_layers != 48 || g.n_expert != 512);
     if (kva_why_not == nullptr && (g.n_layers != 48 || g.n_expert != 512)) {
         // STRATA_KVA_ANY_MODEL=1 (research): allowed on a shape KVA was not measured on, with a warning once
@@ -3327,8 +3333,6 @@ bool Prefill::run_impl(const int64_t* tokens, int64_t n, int64_t pos0, std::stri
                          (long long) g.n_layers, (long long) g.n_expert);
     }
     const bool kva_run = kva_why_not == nullptr;
-    const int64_t kva_split = std::min<int64_t>(std::max<int64_t>(kva.split, 1), g.n_layers);
-    const int64_t kva_frontier = std::max<int64_t>(0, n - kva_suffix);
     static KvaTap kva_capture;   // process-wide: one cold read at a time, so the per-layer position is enough
     static KvaTap kva_oracle;
     int64_t kva_positions = 0, kva_chunks = 0;   // what actually took the approximate path (diagnostics)

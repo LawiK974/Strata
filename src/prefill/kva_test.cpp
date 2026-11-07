@@ -92,7 +92,10 @@ int main() {
         CHECK(is(c.decline(eng, 0, 14600, 24, -1, 48, false, false, &routine), "a layer split (not the whole trunk)") && !routine);
         CHECK(is(c.decline(eng, 0, 14600, 0, 24, 48), "a layer split (not the whole trunk)"));
         CHECK(is(c.decline(eng, 0, 14600, 0, -1, 48, true), "a prompt with pictures"));
-        CHECK(is(c.decline(eng, 0, 14600, 0, -1, 48, false, true), "the DFlash2 drafter reads the late layers' hidden states"));
+        // DFlash2: the caller passes true only when the drafter's taps fall inside the approximated prefix (prefill.cpp
+        // compares tap_first_ with n - suffix); taps in the exact tail (the last 2047 rows) do not decline.
+        CHECK(is(c.decline(eng, 0, 14600, 0, -1, 48, false, true), "the DFlash2 drafter's taps fall inside the approximated prefix (lower STRATA_KVA_SUFFIX)"));
+        CHECK(c.decline(eng, 0, 14600, 0, -1, 48, false, false) == nullptr);   // the taps sit inside the 2048-token tail
         // the engine rules the whole process out (batch slots, a layer split, a peer device)
         KvaEngine blocked = eng;
         blocked.blocked = "batch slots (--batch)";
