@@ -1,0 +1,36 @@
+# The toks-backed pack tokenizer, compiled inside the image: nothing is built on the host.
+#
+#     docker/build_tokenizer.sh            # podman, needs a toks checkout
+#     podman run --rm -v <pack>/tokenizer:/pack:ro strata-toks-tokenizer:local
+#
+# toks (https://github.com/actual-computer/toks) is built from the sources docker/toks-src/, which
+# docker/build_tokenizer.sh copies in from a toks checkout and removes afterwards.  This image is a test
+# rig, not the Strata serving image: docker/Dockerfile ships the engine package and needs a GPU.
+FROM ubuntu:24.04
+
+ARG TOKS_CSTRICT="-Wall -Wextra -Werror -Wno-error=attributes"
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates gcc g++ make python3 python3-pip \
+ && pip install --break-system-packages regex \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY docker/toks-src /build/toks
+COPY include/strata/tokenizer /build/strata/include/strata/tokenizer
+COPY src/tokenizer /build/strata/src/tokenizer
+COPY tools/strata_tokenizer.py /build/strata/tools/strata_tokenizer.py
+COPY docker/tokenizer_check.py /build/strata/docker/tokenizer_check.py
+
+# toks' own Makefile builds the static library; gcc needs the attributes warning relaxed to keep -Werror.
+RUN cd /build/toks && make CC=gcc CSTRICT="$TOKS_CSTRICT" lib -j"$(nproc)"
+
+RUN g++ -O2 -Wall -Wextra -I /build/strata/include -I /build/toks/include \
+      /build/strata/src/tokenizer/toks_tokenizer.cpp /build/toks/build/linux-x86_64/libtoks.a \
+      -o /usr/local/bin/strata-toks-tokenizer \
+ && g++ -O2 -Wall -Wextra -I /build/strata/include -I /build/toks/include \
+      /build/strata/src/tokenizer/toks_tokenizer_test.cpp /build/toks/build/linux-x86_64/libtoks.a \
+      -o /usr/local/bin/toks_tokenizer_test
+
+WORKDIR /build/strata
+ENV PYTHONPATH=/build/strata/tools
+CMD ["sh", "-c", "toks_tokenizer_test /pack && python3 docker/tokenizer_check.py /pack"]
