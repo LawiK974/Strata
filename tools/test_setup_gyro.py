@@ -2,6 +2,7 @@
 never a default, and the MCP server's recommendation naming them only where nothing else fits.  Offline."""
 import pathlib
 import sys
+import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -9,6 +10,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
 import setup  # noqa: E402
 import strata_mcp as M  # noqa: E402
+from strata_control import setup_config  # noqa: E402
 
 
 def hardware(ram, vram):
@@ -116,6 +118,30 @@ class GyroEngineVersionTest(unittest.TestCase):
     def test_the_pack_reader_is_in_the_source_this_minimum_describes(self):
         text = (ROOT / "src" / "kernels" / "cpu" / "expert_layout.cpp").read_text(encoding="utf-8")
         self.assertIn("native_experts.txt v5 declares Hadamard-folded experts", text)
+
+
+class SharpTemplateDefaults(unittest.TestCase):
+    def test_only_gyro_s_and_swift_iq2_xs_get_the_sharp_medium_overlay(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for family, model in (("gyro", "Gyro-S"), ("swift", "IQ2_XS")):
+                pack = pathlib.Path(directory) / f"{family}-{model}"
+                tokenizer = pack / "tokenizer"
+                tokenizer.mkdir(parents=True)
+                (tokenizer / "chat_template.jinja").write_text("model template")
+                (tokenizer / "vocab.json").write_text("{}")
+
+                selected = setup_config.tokenizer_for(pack, family, model, ROOT)
+
+                self.assertEqual(selected, pack / "tokenizer-sharp")
+                self.assertEqual((selected / "vocab.json").read_text(), "{}")
+                self.assertEqual((tokenizer / "chat_template.jinja").read_text(), "model template")
+                self.assertEqual((selected / "chat_template.jinja").read_bytes(),
+                                 (ROOT / "serve" / "chat_template_sharp_medium.jinja").read_bytes())
+
+            pack = pathlib.Path(directory) / "gyro-Gyro-M"
+            (pack / "tokenizer").mkdir(parents=True)
+            self.assertEqual(setup_config.tokenizer_for(pack, "gyro", "Gyro-M", ROOT), pack / "tokenizer")
+            self.assertFalse((pack / "tokenizer-sharp").exists())
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ speed switches, the cards, the vision section, the calibration).  Nothing in the
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,6 +25,18 @@ from typing import Any
 #: Windows floor of 2560 MiB does not replace it (G16).  The app's own reserve and the one pictures on write are 700 or more already, so this is one rule for
 #: every size on a single-card Windows Strix Halo (no size threshold: a new model of unknown size could hang the same way).
 UMA_WIN_RESERVE_MIB = 700
+
+SHARP_MEDIUM_MODELS = {("gyro", "Gyro-S"), ("swift", "IQ2_XS")}
+
+
+def tokenizer_for(pack: Path, family: str, model: str, root: Path) -> Path:
+    tokenizer = Path(pack) / "tokenizer"
+    if (family, model) not in SHARP_MEDIUM_MODELS:
+        return tokenizer
+    sharp = Path(pack) / "tokenizer-sharp"
+    shutil.copytree(tokenizer, sharp, dirs_exist_ok=True)
+    shutil.copyfile(root / "serve" / "chat_template_sharp_medium.jinja", sharp / "chat_template.jinja")
+    return sharp
 
 
 @dataclass
@@ -422,7 +435,8 @@ def config_for(inp: SetupInputs, lib) -> SetupConfig:
         # the package's profile, with llama.cpp's flags (the engine takes the same ones)
         args += ["--control-vector-scaled", f"{esp}:1.0", "--control-vector-layer-range", "4", "44",
                  "--cvec-mode", "project", "--cvec-dir", "per-layer"]
-    cfg = {"exe": engine_exe(eng), "args": args, "cwd": str(ROOT), "tokenizer": str(pack / "tokenizer"),
+    cfg = {"exe": engine_exe(eng), "args": args, "cwd": str(ROOT),
+           "tokenizer": str(tokenizer_for(pack, family, model, ROOT)),
            "model_name": f"{fam['name']}-{model.lower()}", "log": str(home() / f"strata-{tag.lower()}.log"),
            "lib_dirs": lib_dirs, "port": port}
     if cuda_tk == 12:                                  # the experimental CUDA 12 engine (engine-cuda12/)
