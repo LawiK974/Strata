@@ -122,6 +122,16 @@ class Scripts(unittest.TestCase):
             self.assertTrue(metal)
             for name in sorted(metal):
                 self.assertTrue((ctx / "terminal-src" / "engine" / "metal" / "tools" / f"{name}.py").is_file(), f"build.sh did not copy metal/tools/{name}.py into the context")
+            # the third_party folders the bundle carries (the first v0.2.16 image build stopped at
+            # "No such file or directory: '/src/engine/third_party/strata-gguf-py'")
+            third: set[str] = set()
+            for node in pt.body:
+                if isinstance(node, ast.Assign) and any(getattr(t, "id", "") == "INSTALLER_THIRD_PARTY" for t in node.targets):
+                    third.update(ast.literal_eval(node.value))
+            self.assertTrue(third)
+            for name in sorted(third):
+                folder = ctx / "terminal-src" / "engine" / name
+                self.assertTrue(folder.is_dir() and any(folder.rglob("*.py")), f"build.sh did not copy {name} into the context")
 
     def test_scripts_use_unix_line_ends(self):
         for name in ("entrypoint.sh", "strata-wrapper.sh", "healthcheck.sh", "build.sh", "publish.sh"):
