@@ -46,9 +46,13 @@ WINDOWS_DRIVER = (
 # libdrm, libelf, libtinfo, libcrypt, libffi, libpci, libudev, libX11 and libxcb as "every distribution has these": the AMD packages then
 # shipped without libatomic.so.1 (librocm_sysdeps_numa.so.1 needs it) and a container without the libatomic1 package could not start the
 # engine (boxia, 2026-11-15). Every Linux engine package of 0.2.14 needs nothing else outside this list (archive_uncovered on the release files).
+# Fork WIP: libatomic.so.1 is back in the list. The hip packages the signed feed serves for 0.2.14 and 0.2.15 (build 00157e14b534+rocm, reused
+# URL) carry no libatomic.so.1, so the strict list refuses them and docker/build.sh fails at the verify stage. The runtime image installs
+# libatomic1 (docker/Dockerfile line 68), so the container starts. shortcut: the package stays unbundled, drop this entry when the feed serves a
+# hip package rebuilt by collect_libs.py, which bundles libatomic.so.1 under its soname.
 LINUX_OS = (
     "linux-vdso.so.1", "ld-linux-x86-64.so.2", "ld-linux-aarch64.so.1", "libc.so.6", "libm.so.6", "libdl.so.2", "libpthread.so.0",
-    "librt.so.1", "libutil.so.1", "libresolv.so.2", "libnss_*.so.*", "libgcc_s.so.1", "libstdc++.so.6",
+    "librt.so.1", "libutil.so.1", "libresolv.so.2", "libnss_*.so.*", "libatomic.so.1", "libgcc_s.so.1", "libstdc++.so.6",
 )
 # From the GPU driver package: never bundled.
 LINUX_DRIVER = (
