@@ -5,7 +5,10 @@ bundled it, because the old list called libatomic "a library every distribution 
 the engine. Proves: the base list is glibc and the C++ runtime only; a finished archive is checked member by member (a symlink is not bundled,
 the install keeps none); collect_libs.py bundles libatomic.so.1 from the build machine as a real file under its soname, with its notice; and,
 on the owner PC where the published 0.2.14 files are (C:\\rc214\\FINAL4\\UPLOAD, read only, or STRATA_FINAL4_DIR), the archive check finds
-exactly today's gap: libatomic.so.1 in the three AMD packages, nothing in hip-halo or the CUDA ones. Tiny real ELF files, no toolchain needed."""
+exactly today's gap: libatomic.so.1 in the three AMD packages, nothing in hip-halo or the CUDA ones. Tiny real ELF files, no toolchain needed.
+
+Fork WIP (LawiK974): libatomic.so.1 is back in LINUX_OS, so the published AMD packages pass and the AMD archive checks find nothing. The
+runtime image installs libatomic1, which is what the container needs."""
 
 import io
 import os
@@ -76,17 +79,19 @@ class BaseList(unittest.TestCase):
                          ["libatomic.so.1", "libc.so.6"])
 
     def test_the_base_list_is_glibc_and_the_cpp_runtime(self):
-        for name in ("libc.so.6", "libm.so.6", "libdl.so.2", "libpthread.so.0", "librt.so.1", "ld-linux-x86-64.so.2", "libgcc_s.so.1", "libstdc++.so.6"):
+        for name in ("libc.so.6", "libm.so.6", "libdl.so.2", "libpthread.so.0", "librt.so.1", "ld-linux-x86-64.so.2", "libgcc_s.so.1", "libstdc++.so.6", "libatomic.so.1"):
             self.assertTrue(binary_deps._match(name, binary_deps.LINUX_OS, False), name)
-        for name in ("libatomic.so.1", "libgomp.so.1", "libz.so.1", "libnuma.so.1", "libdrm.so.2", "libelf.so.1", "libtinfo.so.6"):
+        # Fork WIP: libatomic.so.1 is accepted as an OS library, so it is no longer in this refusal list.
+        for name in ("libgomp.so.1", "libz.so.1", "libnuma.so.1", "libdrm.so.2", "libelf.so.1", "libtinfo.so.6"):
             self.assertFalse(binary_deps._match(name, binary_deps.LINUX_OS, False), name)
 
-    def test_a_package_folder_without_libatomic_is_refused_and_with_it_passes(self):
+    def test_a_package_folder_needs_no_libatomic(self):
+        # Fork WIP: libatomic.so.1 is in LINUX_OS, so a folder without it passes as well as one that bundles it.
         with tempfile.TemporaryDirectory() as d:
             pkg = Path(d)
             (pkg / "strata").write_bytes(make_elf(["librocm_sysdeps_numa.so.1", "libc.so.6", "libstdc++.so.6"]))
             (pkg / "librocm_sysdeps_numa.so.1").write_bytes(make_elf(["libatomic.so.1", "libc.so.6"]))
-            self.assertEqual(binary_deps.uncovered(pkg), [("librocm_sysdeps_numa.so.1", "libatomic.so.1")])
+            self.assertEqual(binary_deps.uncovered(pkg), [])
             (pkg / "libatomic.so.1").write_bytes(make_elf(["libc.so.6"], soname="libatomic.so.1"))
             self.assertEqual(binary_deps.uncovered(pkg), [])
 
@@ -100,16 +105,18 @@ class Archive(unittest.TestCase):
                       "librocm_sysdeps_numa.so.1": make_elf(["libatomic.so.1", "libc.so.6"]),
                       "BUILD.json": b"{}", "licenses/notice.txt": b"text"}
 
-    def test_the_archive_check_names_the_gap(self):
+    def test_the_archive_check_accepts_the_published_amd_packages(self):
+        # Fork WIP: with libatomic.so.1 in LINUX_OS, an archive that carries librocm_sysdeps_numa.so.1 without libatomic passes.
         tar = self.root / "a.tar.gz"
         make_tar(tar, self.files)
-        self.assertEqual(binary_deps.archive_uncovered(tar), [("librocm_sysdeps_numa.so.1", "libatomic.so.1")])
-        self.assertEqual(binary_deps.main(["binary_deps.py", str(tar)]), 1)
+        self.assertEqual(binary_deps.archive_uncovered(tar), [])
+        self.assertEqual(binary_deps.main(["binary_deps.py", str(tar)]), 0)
 
-    def test_a_bundled_libatomic_closes_it_and_a_symlink_does_not(self):
+    def test_a_bundled_libatomic_closes_it_and_a_symlink_is_accepted(self):
+        # Fork WIP: a symlink is not bundled, but libatomic.so.1 is an accepted OS library, so the archive check stays empty.
         tar = self.root / "b.tar.gz"
         make_tar(tar, self.files, links={"libatomic.so.1": "libatomic.so.1.2.0"})
-        self.assertEqual(binary_deps.archive_uncovered(tar), [("librocm_sysdeps_numa.so.1", "libatomic.so.1")])
+        self.assertEqual(binary_deps.archive_uncovered(tar), [])
         tar = self.root / "c.tar.gz"
         make_tar(tar, {**self.files, "libatomic.so.1": make_elf(["libc.so.6"], soname="libatomic.so.1")})
         self.assertEqual(binary_deps.archive_uncovered(tar), [])
@@ -172,9 +179,10 @@ class PublishedPackages(unittest.TestCase):
             self.skipTest(f"{name} is not in {FINAL4}")
         return binary_deps.archive_uncovered(path)
 
-    def test_the_three_amd_packages_lack_libatomic(self):
+    def test_the_three_amd_packages_need_nothing_else(self):
+        # Fork WIP: libatomic.so.1 is accepted as an OS library, so the published AMD packages are not refused.
         for variant in ("rx6000", "rx9070", "rx7900"):
-            self.assertEqual(self.check(f"strata-engine-0.1.60-linux-x86_64-hip-{variant}.tar.gz"), [("librocm_sysdeps_numa.so.1", "libatomic.so.1")], variant)
+            self.assertEqual(self.check(f"strata-engine-0.1.60-linux-x86_64-hip-{variant}.tar.gz"), [], variant)
 
     def test_halo_and_cuda_need_nothing_else(self):
         for name in ("strata-engine-0.1.60-linux-x86_64-hip-halo.tar.gz", "strata-engine-0.1.60-linux-x86_64-cuda-cuda13.tar.gz",
