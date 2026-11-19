@@ -19,7 +19,7 @@ Docker on a **Mac** has no access to the Mac's graphics chip (no Metal): use the
 | --- | --- | --- |
 | NVIDIA **RTX 20, 30, 40, 50** series (and the matching RTX A / Quadro cards) | `0.2.7-cuda13` | NVIDIA driver **580 or newer**, [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) |
 | NVIDIA **GTX 10 (Pascal), Tesla P100, V100 (Volta)**, or any NVIDIA card whose driver is **575 to 579** | `0.2.7-cuda12` | NVIDIA driver **575 or newer**, the same toolkit |
-| AMD **RX 6000** series (RDNA 2, gfx1030 / gfx1031) | `0.2.3-rocm-gfx1031` | the `amdgpu` kernel driver |
+| AMD **RX 6000** series (RDNA 2, gfx1030 / gfx1031) | `0.2.7-rocm-gfx1031` | the `amdgpu` kernel driver |
 | AMD **RX 9000** series and Radeon AI PRO R9700 (RDNA 4, gfx1200 / gfx1201) | `0.2.7-rocm-gfx120x` | the `amdgpu` kernel driver (Linux 6.8+) |
 | AMD **RX 7000** series (RDNA 3, gfx1100 / gfx1101 / gfx1102) | `0.2.7-rocm-gfx110x` | the `amdgpu` kernel driver |
 | AMD **Ryzen AI Max** ("Strix Halo", Radeon 8060S, gfx1151) | `0.2.7-rocm-gfx1151` | the `amdgpu` kernel driver |
