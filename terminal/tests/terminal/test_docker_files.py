@@ -361,8 +361,9 @@ class Publishing(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         self.assertNotIn("\r", text)
         self.assertIn('push=""', text)                      # no --push, no docker push
-        pushes = re.findall(r'^[^#\n]*docker push "', text, re.M)
+        pushes = re.findall(r'^[^#\n]*push_retry "', text, re.M)
         self.assertEqual(len(pushes), 2, pushes)             # the version tag and latest-<flavor>, both inside `if [ -n "$push" ]`
+        self.assertEqual(len(re.findall(r'docker push "', text)), 1)  # one push site, inside the retry helper
 
     def test_every_flavor_of_the_document_is_one_the_fetch_script_knows(self):
         src = (DOCKER / "fetch-engines.py").read_text(encoding="utf-8")
@@ -373,6 +374,7 @@ class Publishing(unittest.TestCase):
             self.assertIn(f"0.2.20-{flavor}", doc)
         publish = (DOCKER / "publish.sh").read_text(encoding="utf-8")
         self.assertIn("flavor_list=${flavors:-cuda13,cuda12,rocm-gfx1031", publish)
+        self.assertIn("push_retry", publish)
 
     def test_build_script_copies_everything_the_terminal_package_needs(self):
         """docker/build.sh lists the Terminal's files by hand; the list must cover package_terminal.py's payload (it once missed docs/TERMINAL_LAUNCH.md)."""

@@ -60,6 +60,18 @@ mkdir -p "$work"
 cleanup() { if [ -n "$own_work" ]; then rm -rf "$work"; fi; }
 trap cleanup EXIT
 
+# GHCR can answer that a blob is already in the repository and let docker skip its upload, then reject the
+# manifest with "unknown blob". A retry re-runs the existence check and uploads the layer that is missing.
+push_retry() {
+  n=1
+  while true; do
+    docker push "$1" && return 0
+    if [ "$n" -ge 3 ]; then return 1; fi
+    echo "push of $1 failed (try $n of 3), retrying in 30s" >&2
+    n=$((n + 1)); sleep 30
+  done
+}
+
 built=""
 # one flavor at a time: the package is deleted after its image is built, so the disk never holds more than one
 flavor_list=${flavors:-cuda13,cuda12,rocm-gfx1031,rocm-gfx120x,rocm-gfx110x,rocm-gfx1151,rocm-igpu,sycl}
@@ -87,8 +99,8 @@ for flavor in $(echo "$flavor_list" | tr ',' ' '); do
   [ -n "$hy4_folder" ] && rm -rf "$hy4_folder"
   [ -n "$ink_folder" ] && rm -rf "$ink_folder"
   if [ -n "$push" ]; then
-    docker push "$img"
-    [ -n "$latest" ] && docker push "$image:latest-$flavor"
+    push_retry "$img"
+    [ -n "$latest" ] && push_retry "$image:latest-$flavor"
     echo "pushed $img$( [ -n "$latest" ] && echo " and $image:latest-$flavor")"
     docker image inspect "$img" --format '{{index .RepoDigests 0}}' 2>/dev/null || true
     [ -z "$keepimg" ] && { docker rmi "$img" >/dev/null 2>&1 || true; [ -n "$latest" ] && { docker rmi "$image:latest-$flavor" >/dev/null 2>&1 || true; }; }
